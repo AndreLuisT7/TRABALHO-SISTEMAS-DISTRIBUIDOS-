@@ -1,0 +1,121 @@
+@if (store.state(); as state) {
+  <main class="layout">
+    <section class="board-column" aria-label="Partida">
+      <ng-container
+        [ngTemplateOutlet]="player"
+        [ngTemplateOutletContext]="{ color: opponentColor() }"
+      />
+      <app-board
+        [pieces]="state.pieces"
+        [orientation]="myColor()"
+        [myColor]="myColor()"
+        [interactive]="store.canPlay()"
+        [lastMove]="lastMove()"
+        [inCheck]="state.inCheck"
+        (moveRequested)="onMove($event)"
+      />
+      <ng-container [ngTemplateOutlet]="player" [ngTemplateOutletContext]="{ color: myColor() }" />
+    </section>
+
+    <aside class="card side">
+      <div class="turn" [class.mine]="store.canPlay()" aria-live="polite">{{ turnText() }}</div>
+
+      @if (store.error(); as error) {
+        <p class="alert" role="alert">{{ error }}</p>
+      }
+
+      <h2>Lances</h2>
+      <div class="history" tabindex="0" aria-label="Histórico de lances">
+        @if (moveRows().length) {
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Brancas</th>
+                <th scope="col">Pretas</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of moveRows(); track row.number) {
+                <tr>
+                  <td class="muted">{{ row.number }}</td>
+                  <td>{{ row.white }}</td>
+                  <td>{{ row.black }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="muted empty">Nenhum lance ainda.</p>
+        }
+      </div>
+
+      @if (state.status === 'IN_PROGRESS') {
+        @if (confirmingResign()) {
+          <div class="confirm">
+            <span>Desistir da partida?</span>
+            <button type="button" class="danger" (click)="resign()">Sim, desistir</button>
+            <button type="button" (click)="confirmingResign.set(false)">Continuar jogando</button>
+          </div>
+        } @else {
+          <button
+            type="button"
+            [disabled]="store.connection() !== 'CONNECTED' || store.busy()"
+            (click)="confirmingResign.set(true)"
+          >
+            Desistir
+          </button>
+        }
+      }
+    </aside>
+  </main>
+
+  @if (pendingPromotion()) {
+    <div class="overlay" (keydown.escape)="pendingPromotion.set(null)">
+      <div class="card dialog" role="dialog" aria-modal="true" aria-labelledby="promotion-title">
+        <h2 id="promotion-title">Promover peão para</h2>
+        <div class="promotion-options">
+          @for (type of promotionOptions; track type) {
+            <button
+              type="button"
+              class="promotion"
+              [autofocus]="$first"
+              [attr.aria-label]="pieceName(type)"
+              (click)="promote(type)"
+            >
+              {{ glyph(type) }}
+            </button>
+          }
+        </div>
+        <button type="button" (click)="pendingPromotion.set(null)">Cancelar</button>
+      </div>
+    </div>
+  }
+
+  @if (state.result) {
+    <div class="overlay">
+      <div class="card dialog" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <h2 id="result-title" class="result-title">{{ resultTitle() }}</h2>
+        <p class="muted">{{ resultReason() }}</p>
+        <button type="button" class="primary" autofocus (click)="store.leave()">
+          Voltar ao início
+        </button>
+      </div>
+    </div>
+  }
+
+  <ng-template #player let-color="color">
+    <div class="player">
+      <span class="dot" [class.white]="color === 'WHITE'" aria-hidden="true"></span>
+      <span class="player-name">
+        {{ playerName(color) }}
+        <small class="muted">({{ colorName(color) }})</small>
+      </span>
+      <span class="captured" [attr.aria-label]="capturedLabel(capturedBy(color))">
+        @for (type of capturedBy(color); track $index) {
+          <span aria-hidden="true">{{ glyph(type) }}</span>
+        }
+      </span>
+    </div>
+  </ng-template>
+}
